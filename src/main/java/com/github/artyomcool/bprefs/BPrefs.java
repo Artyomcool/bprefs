@@ -355,6 +355,7 @@ public class BPrefs implements SharedPreferences {
 
             @SuppressWarnings("BooleanMethodIsAlwaysInverted")
             private boolean commitToMemory() {
+                awaitForRead();
                 synchronized (map) {
                     ConcurrentHashMap<String, Object> transaction = this.transaction.get();
 
@@ -397,15 +398,7 @@ public class BPrefs implements SharedPreferences {
 
     @SuppressWarnings("unchecked")
     private <T> T getObject(String key, T def) {
-        Future<?> read = this.read;
-        if (read != null) {
-            try {
-                read.get();
-                this.read = null;
-            } catch (InterruptedException | ExecutionException e) {
-                throw new IllegalStateException(e);
-            }
-        }
+        awaitForRead();
         ConcurrentHashMap<String, ?> patch = this.patch;
         if (patch != null) {
             Object result = patch.get(key);
@@ -419,6 +412,18 @@ public class BPrefs implements SharedPreferences {
         }
         Object result = map.get(key);
         return result == null ? def : (T) result;
+    }
+
+    private void awaitForRead() {
+        Future<?> read = this.read;
+        if (read != null) {
+            try {
+                read.get();
+                this.read = null;
+            } catch (InterruptedException | ExecutionException e) {
+                throw new IllegalStateException(e);
+            }
+        }
     }
 
     private static class ClearMarkerMap<K, V> extends ConcurrentHashMap<K, V> {}
